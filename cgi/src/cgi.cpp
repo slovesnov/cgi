@@ -37,7 +37,7 @@ std::string const& CgiParameters::key(size_t i) const {
 
 std::string const& CgiParameters::value(size_t i) const {
 	assert(i < size());
-	return (*this)[i].first;
+	return (*this)[i].second;
 }
 
 Cgi::Cgi() {
