@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<style>
+		button,
+		input {
+			margin-top: 2px;
+		}
+	</style>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<script>
+		function load() {
+			let s = location.href, i;
+			if (s.startsWith("file:")) {
+				i = s.lastIndexOf('/')
+				window.location = 'http://localhost' + s.substring(i)
+			}
+		}
+
+		function bclick(n) {
+			let o = {}, i, e;
+			for (let i = 0; i < 2; i++) {
+				e = 's' + i
+				o[e] = document.getElementsByName(e)[0].value
+			}
+			fetchgetpost('cgi-bin/cgi.exe', o, n, callback)
+		}
+
+		function callback(s) {
+			document.getElementById('p').innerHTML = s
+		}
+
+		function fetchgetpost(url, p, post, f) {
+			let o, body = new URLSearchParams(p)
+			if (post) {
+				o = {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body
+				}
+			}
+			else {
+				url += "?" + body
+			}
+			fetch(url, o)
+				.then(r => r.text())
+				.then(r => f(r))
+				.catch(e => f(e))
+		}
+	</script>
+</head>
+
+<body onload="load()">
+	<form action="cgi-bin/cgi.exe">
+		строка 1 <input type="text" name="s0" value="нескомпрометированный"><br>
+		строка 2 <input type="text" name="s1" value="термокомпенсированный"><br>
+		<button type="submit">submit form get</button>
+		<button type="submit" formmethod="post">submit form post</button>
+	</form>
+	<button onclick="bclick(0)">fetch get</button>
+	<button onclick="bclick(1)">fetch post</button>
+	<p id="p"></p>
+</body>
+
+</html>

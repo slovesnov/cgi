@@ -1,13 +1,44 @@
 #include "cgi.h"
 
-int main() {
-	std::string s, q[2], t[2];
-	int i;
+using VUint = std::vector<uint32_t>;
 
+VUint utf8ToVector(std::string const &s, bool sort) {
+	VUint v;
+	uint32_t b;
+	int i;
+	const uint8_t *p = (const uint8_t*) s.c_str();
+	while (*p) {
+		if ((*p & 0x80) == 0) {
+			i = 0;
+		} else if ((*p & 0xE0) == 0xC0) {
+			i = 1;
+		} else if ((*p & 0xF0) == 0xE0) {
+			i = 2;
+		} else if ((*p & 0xF8) == 0xF0) {
+			i = 3;
+		} else {
+			std::cerr << "Unrecognized lead byte (" << std::hex << *p << ")"
+					<< std::endl;
+			break;
+		}
+		for (b = 0; i >= 0; i--) {
+			b |= *p++ << (i * 8);
+		}
+		v.push_back(b);
+	}
+	if (sort) {
+		std::sort(v.begin(), v.end());
+	}
+	return v;
+}
+
+int main() {
+	VUint t[2];
+	int i;
 	Cgi c;
 
 	if (!c.ok()) {
-		std::cout << c.getErrorMessage();
+		std::cout << c.getErrorMessage() << std::endl;
 		return 1;
 	}
 
@@ -18,15 +49,11 @@ int main() {
 	std::cout << "}";
 
 	if (c.size() < 2) {
-		std::cout << Cgi::encode("слишком мало параметров", true);
+		std::cout << "too few parameters";
 	} else {
 		for (i = 0; i < 2; i++) {
-			s = c.value(i);
-			q[i] = s;
-			std::sort(q[i].begin(), q[i].end());
-			t[i] = Cgi::encode(s, false);
-			std::sort(t[i].begin(), t[i].end());
+			t[i] = utf8ToVector(c.value(i), true);
 		}
-		std::cout << (q[0] == q[1]) << " " << (t[0] == t[1]);
+		std::cout << " " << (t[0] == t[1]);
 	}
 }
