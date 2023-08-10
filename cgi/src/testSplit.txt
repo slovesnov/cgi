@@ -14,7 +14,7 @@
  *
 */
 
-#include "cgi.h"
+#include "cgi/cgi.h"
 #include <algorithm>
 #include <fstream>
 #include <map>

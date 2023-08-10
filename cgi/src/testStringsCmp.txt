@@ -1,4 +1,4 @@
-#include "cgi.h"
+#include "cgi/cgi.h"
 
 using VUint = std::vector<uint32_t>;
 
