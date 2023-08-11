@@ -2,12 +2,6 @@
 <html>
 
 <head>
-	<style>
-		button,
-		input {
-			margin-top: 2px;
-		}
-	</style>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<script>
 		function load() {
@@ -19,35 +13,28 @@
 		}
 
 		function bclick(n) {
-			let o = {}, i, e;
-			for (let i = 0; i < 2; i++) {
-				e = 's' + i
-				o[e] = document.getElementsByName(e)[0].value
-			}
-			fetchgetpost('cgi-bin/cgi.exe', o, n, callback)
+			let e = document.querySelector("form")
+			fetchgetpost(e.action, new FormData(e), callback, n)
 		}
 
 		function callback(s) {
 			document.getElementById('p').innerHTML = s
 		}
 
-		function fetchgetpost(url, p, post, f) {
-			let o, body = new URLSearchParams(p)
+		function fetchgetpost(url, p, f, post = 1, ...params) {
+			let o, body = new URLSearchParams(p);
 			if (post) {
-				o = {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body
-				}
+				o = { method: 'POST', body }
 			}
 			else {
 				url += "?" + body
 			}
 			fetch(url, o)
 				.then(r => r.text())
-				.then(r => f(r))
-				.catch(e => f(e))
+				.then(r => f(r, ...params))
+				.catch(e => f(e, ...params))
 		}
+
 	</script>
 </head>
 
