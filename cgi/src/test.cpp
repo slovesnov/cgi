@@ -54,9 +54,5 @@ int main() {
       t[i] = utf8ToVector(c.value(i), true);
     }
     std::cout << " " << (t[0] == t[1]);
-    std::cout << c.m_contentType<<"\n";
-    for (i = 0; i < 2; i++) {
-      std::cout<<t[i].size() <<" "<<c.value(i).length()<<"\n";
-    }
   }
 }
