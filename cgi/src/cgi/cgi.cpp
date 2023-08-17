@@ -9,72 +9,98 @@
  */
 
 #include "cgi.h"
+#ifdef _WIN32
+#include <fcntl.h>
+#endif
 
 static const std::string CGI_OK = "OK";
+#ifdef _WIN32
+const char SEP = '\\';
+#else
+const char SEP='/';
+#endif
+static const std::string MULTIPART = "multipart/form-data";
 
-Cgi::VSS::const_iterator CgiParameters::index(std::string const &s) const {
-	//need to point out type of p for old g++
-	return std::find_if(begin(), end(),
-			[&s](std::pair<std::string, std::string> const &p) {
-				return p.first == s;
-			});
-}
-
-bool CgiParameters::has(std::string const &s) const {
-	return index(s) != end();
-}
-
-std::string const& CgiParameters::value(std::string const &s) const {
-	VSS::const_iterator it = index(s);
-	assert(it!=end());
-	return it->second;
-}
-
-std::string const& CgiParameters::key(size_t i) const {
-	assert(i < size());
-	return (*this)[i].first;
-}
-
-std::string const& CgiParameters::value(size_t i) const {
-	assert(i < size());
-	return (*this)[i].second;
-}
+#define SHORT_FILENAME (strrchr(__FILE__, SEP) ? strrchr(__FILE__, SEP) + 1 : __FILE__)
+#define CREATE_ERROR(s) m_status="error "+std::string(s)+" file:"+SHORT_FILENAME+" line:"+std::to_string(__LINE__);
+#define CREATE_ERROR_RETURN_FALSE(s) CREATE_ERROR(s);return false;
+#define CREATE_ERROR_PRINT_RETURN(s) CREATE_ERROR(s);std::cout<<m_status;return;
 
 Cgi::Cgi() {
 	std::string s;
 	m_status = CGI_OK;
-	const char *p = getenv("REQUEST_METHOD");
+	const char *p, *p1;
+	p = getenv("REQUEST_METHOD");
 	if (!p) {
-		m_status = "REQUEST_METHOD not found";
+		//not output error, because possible user needs non cgi mode
+		CREATE_ERROR("REQUEST_METHOD not found");
 		return;
 	}
-	//already in cgi mode output header even in case of errors
-	std::cout << "Content-type: text/html;charset=utf-8\n\n";
 	m_method = p;
+	//now in cgi mode always output error
+	std::cout << "Content-type: text/html;charset=utf-8\n\n";
+
+	//already in cgi mode output header even in case of errors
 	if (m_method == "POST") {
-		std::getline(std::cin, s);
+#ifdef _WIN32
+		//otherwise stops on 0x1a
+		_setmode(_fileno( stdin), _O_BINARY);
+#endif
+		p = getenv("CONTENT_TYPE");
+		if (!p) {
+			CREATE_ERROR_PRINT_RETURN("CONTENT_TYPE not found")
+		}
+
+		p1=strchr(p,';');
+		if(p1){
+			m_contentType = std::string(p,p1-p);
+			if(m_contentType==MULTIPART){
+				const char BOUNDARY[] = "boundary=";
+				p = strstr(p1, BOUNDARY);
+				if (!p) {
+					CREATE_ERROR_PRINT_RETURN("boundary not found")
+				}
+				m_boundary = p + strlen(BOUNDARY);
+			}
+		}
+		else{
+			m_contentType = std::string(p);
+		}
+
+		s = "";
+		const int L = 4096;
+		char b[L];
+		int bytes;
+		while ((bytes = fread(b, 1, L, stdin))) {
+			s += std::string(b, bytes);
+		}
 	} else if (m_method == "GET") {
 		p = getenv("QUERY_STRING");
 		if (!p) {
-			m_status = "QUERY_STRING not found";
+			CREATE_ERROR_PRINT_RETURN("QUERY_STRING not found")
 			return;
 		}
 		s = p;
 	} else {
-		m_status = "no post or get method";
+		CREATE_ERROR_PRINT_RETURN("no post or get method")
 		return;
 	}
-	VSS::operator =(parse(s, 0));
+	if (m_contentType==MULTIPART) {
+		if (!parseBoundary(s)) {
+			std::cout << m_status;
+			return;
+		}
+	} else {
+		VSS::operator =(parse(s, 0));
+	}
 
-//	if (parseCookie) {
 	p = getenv("HTTP_COOKIE");
 	if (!p) {
-		m_status = "HTTP_COOKIE not found";
+		CREATE_ERROR_PRINT_RETURN("HTTP_COOKIE not found")
 		return;
 	}
 	s = p;
 	m_cookie = parse(s, 1);
-//	}
 }
 
 bool Cgi::ok() const {
@@ -159,4 +185,94 @@ std::string Cgi::encode(const std::string &s, bool toUtf8) {
 	delete[] out;
 	iconv_close(cd);
 	return r;
+}
+
+bool Cgi::parseBoundary(const std::string &s) {
+	const std::string name = "name=\"";
+	const std::string filename = "filename=\"";
+	const std::string ct = "Content-Type: ";
+	const std::string eol = "\r\n";
+
+	const std::string sbegin = "--" + m_boundary + eol;
+	const std::string send = eol + "--" + m_boundary + "--" + eol;
+	const size_t start = sbegin.length();
+	const size_t end = send.length();
+
+	size_t p, p1, ps;
+	std::string n, v, e1, type, fname;
+	CgiFile file;
+	if (s.substr(0, start) != sbegin) {
+		CREATE_ERROR_RETURN_FALSE("invalid start");
+	}
+	if (s.substr(s.length() - end) != send) {
+		CREATE_ERROR_RETURN_FALSE("invalid end");
+	}
+
+	auto ve = split(s.substr(start, s.length() - end - start), eol + sbegin);
+	for (auto e : ve) {
+		p = ps = e.find("\n");
+		if (p == std::string::npos) {
+			CREATE_ERROR_RETURN_FALSE("no new line in parameter header found");
+		}
+
+		e1 = e.substr(0, p);
+
+		p = e1.find(name);
+		if (p == std::string::npos) {
+			CREATE_ERROR_RETURN_FALSE("no name=\" found");
+		}
+		p += name.length();
+		p1 = e1.find('"', p);
+		if (p1 == std::string::npos) {
+			CREATE_ERROR_RETURN_FALSE("\" after name found");
+		}
+		n = e1.substr(p, p1 - p);
+
+		p = e1.find(filename);
+		if (p == std::string::npos) {
+			p = e.find(eol + eol);
+			if (p == std::string::npos) {
+				CREATE_ERROR_RETURN_FALSE("no double eol found");
+			}
+			v = e.substr(p + 2 * eol.length());
+			push_back( { n, v });
+		} else {
+			p += filename.length();
+			p1 = e1.find('"', p);
+			if (p1 == std::string::npos) {
+				CREATE_ERROR_RETURN_FALSE("no file name close quote found");
+			}
+			if (p1 != p) { //if p1==p no files not need to add
+				file.name = e1.substr(p, p1 - p); //filename
+				ps++;
+				p1 = e.find("\r", ps);
+				if (p1 == std::string::npos) {
+					CREATE_ERROR_RETURN_FALSE("no 2nd line found");
+				}
+				file.type = e.substr(ps + ct.length(), p1 - ps - ct.length());
+
+				p = e.find(eol + eol);
+				if (p == std::string::npos) {
+					CREATE_ERROR_RETURN_FALSE("no double eol found");
+				}
+				file.content = e.substr(p + 2 * eol.length());
+				if (n.substr(n.length() - 2) == "[]") { //remove last [] like in php
+					n = n.substr(0,n.length() - 2);
+				}
+				auto it = m_files.find(n);
+				if (it == m_files.end()) {
+					m_files.push_back( { n, {file} });
+				} else {
+					it->second.push_back(file);
+				}
+			}
+		}
+
+//		auto l=split(e,eol);
+//		for(auto a:l){
+//			std::cout<<" ["<<a<<"]"<<std::endl;
+//		}
+//		std::cout<<"###"<<n<<"="<<v<<" "<<type<<"###"<<std::endl;
+	}
+	return true;
 }

@@ -1,0 +1,17 @@
+class Cgi supports content type application/x-www-form-urlencoded and multipart/form-data
+so it's working when use UrlSearchParams() and FormData()
+also compiles ok for old gcc 4.8.5
+
+<form action="cgi-bin/test.exe" method="post" enctype="multipart/form-data">
+string 1 <input type="text" name="s0" value="string1"><br>
+string 2 <input type="text" name="s1" value="string2"><br>
+<input type="file" name="file[]" multiple/>
+<input type="file" name="file1[]" multiple/>
+<button type="submit">submit form get</button>
+<button type="submit" formmethod="post">submit form post</button>
+</form>
+
+if use method get for forms with files then not working under php & cgi c++
+if not set enctype="multipart/form-data" and click submit post then not working under php & cgi c++ in this case CONTENT TYPE application/x-www-form-urlencoded
+
+if omit square brackets <input type="file" name="file" multiple/> then under php $_FILES['name'] will not be array, cgi c++ library is ok with and without square brackets.

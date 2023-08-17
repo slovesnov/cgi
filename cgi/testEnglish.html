@@ -21,18 +21,18 @@
 			document.getElementById('p').innerHTML = s
 		}
 
-		function fetchgetpost(url, p, f, post = 1, ...params) {
-			let o, body = new URLSearchParams(p);
+		function fetchgetpost(url, body, f, post = 1) {
+			let o
 			if (post) {
 				o = { method: 'POST', body }
 			}
 			else {
-				url += "?" + body
+				url += "?" + new URLSearchParams(body)
 			}
 			fetch(url, o)
 				.then(r => r.text())
-				.then(r => f(r, ...params))
-				.catch(e => f(e, ...params))
+				.then(r => f(r))
+				.catch(e => f(e))
 		}
 
 	</script>

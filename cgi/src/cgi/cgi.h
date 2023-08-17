@@ -19,46 +19,87 @@
 #include <cassert>
 #include <algorithm>
 
-class CgiParameters: public std::vector<std::pair<std::string, std::string>> {
+//also supports old gcc 4.8.5
+//application/x-www-form-urlencoded and multipart/form-data
+class CgiFile {
 public:
-	using VString=std::vector<std::string>;
-	using VSS=std::vector<std::pair<std::string, std::string>>;
+	std::string name, type, content;
+	//size=content.length
+};
 
-	VSS::const_iterator index(std::string const &s) const;
+template<class T>
+class CgiParametersTemplate: public std::vector<std::pair<std::string, T>> {
+public:
+	using VSS=std::vector<std::pair<std::string,T>>;
+
+	typename VSS::const_iterator find(std::string const &s) const {
+		return std::find_if(this->begin(), this->end(),
+				[&s](std::pair<std::string, T> const &p) {
+					return p.first == s;
+				});
+	}
+
+	typename VSS::iterator find(std::string const &s) {
+		return std::find_if(this->begin(), this->end(),
+				[&s](std::pair<std::string, T> const &p) {
+					return p.first == s;
+				});
+	}
 
 	//has or not key
-	bool has(std::string const &s) const;
-	std::string const& key(size_t i) const;
-	std::string const& value(size_t i) const;
-	std::string const& value(std::string const &s) const;
-	std::string const& operator[](std::string const &s) const {
+	bool has(std::string const &s) const {
+		return find(s) != this->end();
+	}
+
+	std::string const& key(size_t i) const {
+		assert(i < this->size());
+		VSS const& v=*this;
+		return v[i].first;
+	}
+
+	T const& value(size_t i) const {
+		assert(i < this->size());
+		VSS const& v=*this;
+		return v[i].second;
+	}
+
+	T const& value(std::string const &s) const {
+		typename VSS::const_iterator it = find(s);
+		assert(it!=this->end());
+		return it->second;
+	}
+
+	T const& operator[](size_t i) const {
+		return value(i);
+	}
+
+	T const& operator[](std::string const &s) const {
 		return value(s);
 	}
 
-	//since operator [] is redefined need redefine normal [] operator
-	std::pair<std::string, std::string>const& operator[](size_t i) const {
-		return VSS::operator[](i);
-	}
-
-	CgiParameters const& operator=(VSS const &v) {
+	CgiParametersTemplate const& operator=(VSS const &v) {
 		VSS::operator=(v);
 		return *this;
 	}
 };
 
+using CgiParameters = CgiParametersTemplate<std::string>;
+using CgiFiles = CgiParametersTemplate<std::vector<CgiFile>>;
+
 class Cgi: public CgiParameters {
+
 public:
-	std::string m_status;
-	std::string m_method;
+	std::string m_status, m_boundary, m_contentType, m_method;
 	CgiParameters m_cookie;
+	CgiFiles m_files;
 	Cgi();
 	bool ok() const;
 
-	bool emptyCookie()const{
+	bool emptyCookie() const {
 		return m_cookie.empty();
 	}
 
-	size_t sizeCookie()const{
+	size_t sizeCookie() const {
 		return m_cookie.size();
 	}
 
@@ -82,7 +123,9 @@ public:
 		return m_status;
 	}
 
+	bool parseBoundary(std::string const &s);
 	static VSS parse(std::string const &s, int type = 0);
+	using VString=std::vector<std::string>;
 	static VString split(const std::string &subject,
 			const std::string &separator);
 	static VString split(const std::string &subject,
