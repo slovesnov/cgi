@@ -51,10 +51,10 @@ Cgi::Cgi() {
 			CREATE_ERROR_PRINT_RETURN("CONTENT_TYPE not found")
 		}
 
-		p1=strchr(p,';');
-		if(p1){
-			m_contentType = std::string(p,p1-p);
-			if(m_contentType==MULTIPART){
+		p1 = strchr(p, ';');
+		if (p1) {
+			m_contentType = std::string(p, p1 - p);
+			if (m_contentType == MULTIPART) {
 				const char BOUNDARY[] = "boundary=";
 				p = strstr(p1, BOUNDARY);
 				if (!p) {
@@ -62,8 +62,7 @@ Cgi::Cgi() {
 				}
 				m_boundary = p + strlen(BOUNDARY);
 			}
-		}
-		else{
+		} else {
 			m_contentType = std::string(p);
 		}
 
@@ -85,7 +84,7 @@ Cgi::Cgi() {
 		CREATE_ERROR_PRINT_RETURN("no post or get method")
 		return;
 	}
-	if (m_contentType==MULTIPART) {
+	if (m_contentType == MULTIPART) {
 		if (!parseBoundary(s)) {
 			std::cout << m_status;
 			return;
@@ -257,11 +256,11 @@ bool Cgi::parseBoundary(const std::string &s) {
 				}
 				file.content = e.substr(p + 2 * eol.length());
 				if (n.substr(n.length() - 2) == "[]") { //remove last [] like in php
-					n = n.substr(0,n.length() - 2);
+					n = n.substr(0, n.length() - 2);
 				}
 				auto it = m_files.find(n);
 				if (it == m_files.end()) {
-					m_files.push_back( { n, {file} });
+					m_files.push_back( { n, { file } });
 				} else {
 					it->second.push_back(file);
 				}

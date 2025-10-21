@@ -53,13 +53,13 @@ public:
 
 	std::string const& key(size_t i) const {
 		assert(i < this->size());
-		VSS const& v=*this;
+		VSS const &v = *this;
 		return v[i].first;
 	}
 
 	T const& value(size_t i) const {
 		assert(i < this->size());
-		VSS const& v=*this;
+		VSS const &v = *this;
 		return v[i].second;
 	}
 
